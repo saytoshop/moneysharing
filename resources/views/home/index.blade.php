@@ -2,6 +2,10 @@
 
 @section('content')
 
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
     <div class=" pt-1 ">
         @auth
 
@@ -27,10 +31,77 @@
             @endif
 
             @foreach($groups as $group)
+
                 <h3>{{$group->name}}</h3>
-                <div>бюджет <strong>{{$group->budget()}}</strong> (в том
-                    числе {{auth()->user()->personalBudget($group)}} ваших личных)
+                <div><strong>{{$group->budget()}}</strong>
+{{--                    (из них {{auth()->user()->personalBudget($group)}} ваших личных)--}}
                 </div>
+                    <canvas id="money_{{$group->id}}"></canvas>
+                <div>
+                    @php
+                        $labels = [];
+                        $data = [];
+                    @endphp
+                    @foreach($group->users as $user)
+                        @php
+                            $labels[] = $user->username;
+                            $data[] = $user->personalBudget($group);
+                        @endphp
+{{--                        <div class="col-sm-12">--}}
+{{--                            <span>--}}
+{{--                                {{$user->username}}--}}
+{{--                            </span>--}}
+{{--                            @if($user->multiplicator > 1)--}}
+{{--                               <span class="badge badge-info" title="количество человек"> x{{$user->multiplicator}}</span>--}}
+{{--                            @endif--}}
+{{--                            /--}}
+{{--                            {{$user->personalBudget($group)}}--}}
+{{--                        </div>--}}
+
+                    @endforeach
+                </div>
+                <script type="text/javascript">
+
+                    var labels = {{Js::from($labels)}};
+                    var users = {{Js::from($data)}};
+
+                    const data = {
+                        labels: labels,
+                        datasets: [{
+                            // label: 'Распределение бюджета',
+                            backgroundColor: 'rgb(109,255,99)',
+                            borderColor: 'rgb(109,255,99)',
+                            data: users,
+                        }]
+                    };
+
+                    const config = {
+                        type: 'bar',
+                        data: data,
+                        plugins: [ChartDataLabels],
+                        options: {
+                            plugins:{
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales:{
+                                x:{
+                                    display: false
+                                }
+                            },
+                            indexAxis: 'y',
+                            // barThickness: 20
+
+                        }
+                    };
+
+                    const myChart = new Chart(
+                        document.getElementById("money_{{$group->id}}"),
+                        config
+                    );
+
+                </script>
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item">
                         <a href="#" class="nav-link" data-toggle="tab" data-target="#add" role="tab">Пополнить</a>
@@ -48,10 +119,10 @@
                         <form action="/make_deposit/{{$group->id}}" method="POST" class="form-inline row">
                             @csrf
                             <div class="col-sm-4 mb-2">
-                                <input class="form-control" name="amount" type="text" placeholder="Сумма">
+                                <input class="form-control" name="amount" type="text" placeholder="Сумма" value="{{old('amount')}}">
                             </div>
                             <div class="col-sm-4 mb-2">
-                                <select id="inputState" name="user_id" class="form-control">
+                                <select id="inputState" name="user_id" class="form-control" value="{{old('user_id')}}">
                                     <option value="" selected>Вноситель</option>
                                     @foreach($group->users as $user)
                                         <option value="{{$user->id}}">{{$user->username}}</option>
@@ -67,8 +138,8 @@
                         <form action="/spend_money/{{$group->id}}" method="POST" class="form-inline row">
                             @csrf
                             <div class="col-sm-12 col-md-4">
-                                <input class="form-control mb-2" name="amount" type="text" placeholder="Общая сумма">
-                                <input class="form-control" name="comment" type="text" placeholder="Общий комментарий">
+                                <input class="form-control mb-2" name="amount" type="text" placeholder="Общая сумма" value="{{old('amount')}}">
+                                <input class="form-control" name="comment" type="text" placeholder="Общий комментарий" value="{{old('comment')}}">
                             </div>
                             <div class="col-sm-12 col-md-8">
                                 <table class="table">
@@ -91,7 +162,7 @@
                                             </td>
                                             <td>
                                                 <input type="text" class="form-control"
-                                                       name="data[{{$user->id}}][personal_amount]">
+                                                       name="data[{{$user->id}}][personal_amount]" value="{{old('data.' . $user->id . '.personal_amount')}}">
                                             </td>
                                             <td>
                                                 <input type="text" class="form-control"
@@ -119,23 +190,8 @@
                                                 {{$user->username}}
                                                 </span>
                                             @if(auth()->user()->isGroupAdmin($group))
-                                                <form action="/ru/{{$group->id}}/{{$user->id}}"
-                                                      method="POST"
-                                                      class="w-auto mb-0">
-                                                    @csrf
-                                                    <input type="hidden" name="aa">
-                                                    <button type="submit" class="close" title="Удалить из группы">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </form>
-                                            @endif
-
-                                        </div>
-                                        <div class="card-body">
-                                            <p>Баланс: {{$user->personalBudget($group)}}</p>
-                                            @if(auth()->user()->isGroupAdmin($group))
                                                 <form action="/mult_change/{{$group->id}}/{{$user->id}}"
-                                                      class="form-inline col-sm-6 col-md-3"
+                                                      class="form-inline col-sm-4 col-md-3 mb-0 mr-2"
                                                       method="POST">
                                                     @csrf
 
@@ -150,6 +206,22 @@
                                                     </select>
                                                 </form>
                                             @endif
+                                            @if(auth()->user()->isGroupAdmin($group))
+                                                <form action="/ru/{{$group->id}}/{{$user->id}}"
+                                                      method="POST"
+                                                      class="w-auto mb-0">
+                                                    @csrf
+                                                    <input type="hidden" name="aa">
+                                                    <button type="submit" class="close" title="Удалить из группы">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </form>
+                                            @endif
+
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="mb-0">Баланс: {{$user->personalBudget($group)}}</p>
+
                                         </div>
 
 

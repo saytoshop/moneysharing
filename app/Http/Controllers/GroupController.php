@@ -7,6 +7,7 @@ use App\Models\Operation;
 use App\Models\Purchase;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class GroupController extends Controller
 {
@@ -164,10 +165,14 @@ class GroupController extends Controller
      */
     public function spendMoney(Group $group, Request $request)
     {
-        $request->validate([
+//        dd($request);
+
+
+        $validator = Validator::make($request->all(), [
+            'data.*.personal_amount' => 'nullable|numeric',
             'amount' => 'required',
         ]);
-
+$validator->validate();
         $mainOperation = Operation::create([
             'group_id' => $group->id,
             'type' => 'credit',
